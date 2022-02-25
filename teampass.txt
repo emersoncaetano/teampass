@@ -1,0 +1,316 @@
+----------------INSTALAÇÃO TEAMPASS NO UBUNTU SERVER 20.04--------------------
+Antes de começar, certifique-se de que o servidor LAMP esteja instalado em seu servidor. Se não estiver instalado, você pode instalá-lo com outros
+pacote executando o seguinte comando:
+
+apt-get install apache2 mariadb-server php7.4 php
+7.4-cli libapache2-mod-php7.4 php7.4-mysql php7.4
+-curl php7.4-mbstring php7.4-bcmath php7.4-common
+php7.4-gd php7.4-xml git wget -y
+
+
+Assim que o servidor LAMP estiver instalado, edite o arquivo php.ini e altere algumas configurações:
+
+nano /etc/php/7.4/apache2/php.ini
+
+Modifique as seguintes linhas:
+
+
+memory_limit = 256M
+upload_max_filesize = 100M
+max_execution_time = 360
+date.timezone = Asia/Kolkata
+
+
+
+Quando terminar, você pode prosseguir para a próxima etapa.
+
+-----------------------Create TeamPass Database-------------------------
+
+
+Em seguida, você precisará criar um banco de dados e um usuário para o TeamPass. Primeiro, faça login no shell do MariaDB com o seguinte
+comando:
+
+mysql -u root
+
+
+Após o login, crie um banco de dados e um usuário para o TeamPass com o seguinte comando:
+
+MariaDB [(none)]> create database teampass;
+MariaDB [(none)]> grant all privileges on teampass.* to teampass@localhost identified by "password";
+
+
+Em seguida, libere os privilégios e saia do MariaDB com o seguinte comando:
+
+MariaDB [(none)]> flush privileges;
+MariaDB [(none)]> exit;
+
+
+
+Depois que seu banco de dados for criado, você poderá prosseguir para a próxima etapa.
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------Diretório SalKey-------------------------------------------
+Precisamos criar um diretório que também é dependência da instalação, esse diretório irá armazenar um dado do tipo SAL que será utilizado juntamente com a senha. Daremos o nome desse diretório de salkey.
+
+Criando o diretório:
+
+mkdir /var/www/salkey
+
+Iremos conceder permissão apenas para o usuário do Apache ao diretório salkey:
+
+chown -R www-data:www-data /var/www/salkey
+
+
+
+
+
+--------------------------------------------------Download TeamPass----------------------------
+
+
+Primeiro, você precisará baixar a versão mais recente do TeamPass do repositório Git. Você pode baixá-lo para o
+Diretório raiz da web do Apache com o seguinte comando:
+
+
+
+cd /var/www/html
+git clone https://github.com/nilsteampassnet/TeamPass.git
+
+
+Quando o download for concluído, altere a propriedade para o usuário www-data e defina a permissão adequada com o
+seguinte comando:
+
+
+
+chown -R www-data.www-data /var/www/html/TeamPass/
+chmod -R 775 /var/www/html/TeamPass/
+
+
+
+Quando terminar, você pode prosseguir para a próxima etapa.
+
+
+-------------------------------Configure Apache Web Server----------------------------------
+
+Primeiro, crie um arquivo de configuração de host virtual Apache para o TeamPass com o seguinte comando:
+
+nano /etc/apache2/sites-available/teampass.conf
+
+<VirtualHost *:80>   
+     ServerAdmin admin@example.com
+     DocumentRoot /var/www/html/TeamPass   
+     ServerName teampass.linuxbuz.com
+
+     <Directory /var/www/html/TeamPass>      
+          Options FollowSymlinks
+          AllowOverride All
+          Require all granted
+     </Directory>   
+
+     ErrorLog ${APACHE_LOG_DIR}/teampass_error.log
+     CustomLog ${APACHE_LOG_DIR}/teampass_access.log combined
+
+</VirtualHost>  
+
+
+Salve o arquivo quando terminar. Em seguida, habilite o arquivo de host virtual apache e reinicie o serviço apache para aplicar as alterações:
+
+
+a2ensite teampass
+systemctl restart apache2
+
+
+
+Depois que seu servidor web Apache estiver configurado, você poderá prosseguir para a próxima etapa.
+
+
+
+---------------------------------Secure TeamPass with Let's Encrypt SSL------------------------
+
+.Primeiro, você precisará instalar o cliente Certbot Let's Encrypt em seu servidor. Ele é usado para instalar e gerenciar o certificado SSL Let's Encrypt para seu domínio. 
+Execute o seguinte comando para instalar o Certbot
+
+apt-get install python3-certbot-apache -y
+
+Você precisará fornecer seu endereço de e-mail válido e aceitar o termo de serviço conforme mostrado abaixo:
+
+
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator apache, Installer apache
+Enter email address (used for urgent renewal and security notices) (Enter 'c' to
+cancel): hitjethva@gmail.com
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Please read the Terms of Service at
+https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf. You must
+agree in order to register with the ACME server at
+https://acme-v02.api.letsencrypt.org/directory
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(A)gree/(C)ancel: A
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Would you be willing to share your email address with the Electronic Frontier
+Foundation, a founding partner of the Let's Encrypt project and the non-profit
+organization that develops Certbot? We'd like to send you email about our work
+encrypting the web, EFF news, campaigns, and ways to support digital freedom.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(Y)es/(N)o: Y
+Obtaining a new certificate
+Performing the following challenges:
+http-01 challenge for teampass.linuxbuz.com
+Enabled Apache rewrite module
+Waiting for verification...
+Cleaning up challenges
+Created an SSL vhost at /etc/apache2/sites-available/teampass-le-ssl.conf
+Enabled Apache socache_shmcb module
+Enabled Apache ssl module
+Deploying Certificate to VirtualHost /etc/apache2/sites-available/teampass-le-ssl.conf
+Enabling available site: /etc/apache2/sites-available/teampass-le-ssl.conf
+
+
+
+Em seguida, você precisará selecionar se deseja ou não redirecionar o tráfego HTTP para HTTPS, conforme mostrado abaixo:
+
+Please choose whether or not to redirect HTTP traffic to HTTPS, removing HTTP access.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+1: No redirect - Make no further changes to the webserver configuration.
+2: Redirect - Make all requests redirect to secure HTTPS access. Choose this for
+new sites, or if you're confident your site works on HTTPS. You can undo this
+change by editing your web server's configuration.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Select the appropriate number [1-2] then [enter] (press 'c' to cancel): 2
+
+
+Digite 2 para fazer com que todas as solicitações sejam redirecionadas para acesso HTTPS seguro e pressione Enter para instalar o Let's Encrypt SSL. 
+Depois que a instalação for concluída com êxito, você deverá ver a seguinte saída:
+
+
+
+
+Enabled Apache rewrite module
+Redirecting vhost in /etc/apache2/sites-enabled/teampass.conf to ssl vhost in /etc/apache2/sites-available/teampass-le-ssl.conf
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Congratulations! You have successfully enabled https://teampass.linuxbuz.com
+
+You should test your configuration at:
+https://www.ssllabs.com/ssltest/analyze.html?d=teampass.linuxbuz.com
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/teampass.linuxbuz.com/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/teampass.linuxbuz.com/privkey.pem
+   Your cert will expire on 2020-10-17. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot again
+   with the "certonly" option. To non-interactively renew *all* of
+   your certificates, run "certbot renew"
+ - Your account credentials have been saved in your Certbot
+   configuration directory at /etc/letsencrypt. You should make a
+   secure backup of this folder now. This configuration directory will
+   also contain certificates and private keys obtained by Certbot so
+   making regular backups of this folder is ideal.
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+
+Neste ponto, seu site está protegido com Let's Encrypt SSL. Agora você pode acessá-lo com segurança com o protocolo HTTPS.
+
+
+--------------------Acesse a IU da Web do TeamPass----------------------------------
+
+Agora, acesse sua interface web do TeamPass visitando a URL https://teampass.linuxbuz.com. Você deve ver a tela de boas-vindas do TeamPass:
+
+Clique no botão PRÓXIMO. Você deve ver a tela de verificações do servidor:
+
+Clique no botão LANÇAR e PRÓXIMO. Você deve ver a tela de conexão do banco de dados:
+
+
+Forneça os detalhes do seu banco de dados e clique no botão LAUNCH e NEXT. Você deve ver a tela de preparação:
+
+Clique no botão LANÇAR e PRÓXIMO. Você deve ver a tela de criação da tabela:
+
+Clique no botão LANÇAR e PRÓXIMO. Você deverá ver a tela de Finalização:
+
+
+Clique no botão LANÇAR e PRÓXIMO. Depois que a instalação for concluída com sucesso, você deverá ver a seguinte tela:
+
+
+Agora, clique no botão Mover para a página inicial. Você será redirecionado para a tela de login do TeamPass, conforme mostrado abaixo:
+
+
+Forneça seu nome de usuário como admin e a senha que você escreveu durante o processo de instalação e clique no botão Login. Você deve ver o painel do TeamPass na tela a seguir:
+
+
+Neste guia, você aprendeu como instalar o gerenciador de senhas TeamPass no Ubuntu 20.04 e protegê-lo com Let's Encrypt SSL. Agora você pode explorar o TeamPass e implantá-lo no ambiente de produção. Para obter mais informações, visite a documentação oficial do TeamPass.
+
+
+
+
+----------------------------------------LINKS DE REFERÊNCIA-------------------------------------------
+
+https://www.howtoforge.com/how-to-install-teampass-password-manager-on-ubuntu-2004/#configure-apache-web-server
+
+https://blog.bidela.com.br/teampass/teampass-capitulo-2-resolvendo-dependencias/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
